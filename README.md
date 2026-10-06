@@ -34,6 +34,10 @@ Everything is per world: one map per world, saved on this device under the exten
 
 ## Panel
 
+Open it from ☰ → Views → Mapper, with Alt+M, or the command `Mapper: open the map`; it also adds itself to the
+dock the first time a room is mapped in a session. Settings → Extensions → Mapper → "Show panel" (on / auto /
+off) decides per world whether it is offered.
+
 Toolbar: `Walk` / `Edit` mode · `−` `+` `Fit` `◎` (follow) · floor `▾ Z0 ▴` · area select · `Areas` · `Mapping` (pause
 toggle) · `Details` (inspector) · `Undo` · `☰`.
 

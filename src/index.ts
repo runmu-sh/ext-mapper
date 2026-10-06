@@ -6,7 +6,7 @@
  *  - `tracker.ts`: where each session is, fed by the sources (`sources/gmcp`, `sources/scene`, `sources/text`) and
  *    by other extensions or Lua (`api.scene`), with a game profile (`profiles/`) picked by the world's host.
  *  - `walker.ts`: walks a session along a path through `mu.sessions.send`.
- *  - `panel/`: the dock panel (canvas, inspector, menus); `show: 'auto'` so it appears once a room is known.
+ *  - `panel/`: the dock panel (canvas, inspector, menus); `show: 'always'` so it is in the Views menu as soon as the extension is enabled; it adds itself to the dock when a room is first known.
  *  - `lua/bridge.ts`: `mapper.call` / `mapper.reply` / `mapper.event` for the backend Lua, plus the pasteable library.
  *
  * Everything registered through `mu` is disposed on deactivate; the stores and the tracker are in `ctx.subscriptions`.
@@ -141,7 +141,7 @@ export default defineExtension({
     });
     const mounted = new Map<HTMLElement, ReturnType<typeof mountPanel>>();
     mu.panels.register({
-      id: ID, title: COPY.title, defaultPosition: 'right-bottom', order: 40, show: 'auto',
+      id: ID, title: COPY.title, defaultPosition: 'right-bottom', order: 40, show: 'always',
       mount: (el, pctx) => {
         const m = mountPanel({ mu, store: storeFor, tracker, walker, settings: panelSettings(pctx.worldId ?? '') }, el, pctx);
         mounted.set(el, m);
@@ -150,7 +150,7 @@ export default defineExtension({
       snapshot: (el) => mounted.get(el)?.snapshot(),
       restore: (el, saved) => mounted.get(el)?.restore(saved),
     });
-    // The panel is offered once a session has a known room (one touch per session is enough).
+    // The first known room in a session adds the panel to the dock (one touch per session is enough).
     const touched = new Set<string>();
     tracker.on((e) => { if ((e.type === 'enter' || e.type === 'created') && !touched.has(e.sid)) { touched.add(e.sid); mu.panels.touch(ID, e.sid); } });
     mu.sessions.on('close', (s) => touched.delete(s.id));

@@ -25,7 +25,7 @@ test('activates: panel, commands, settings, API', async () => {
   const host = createHost({ root: ROOT });
   const ext = await host.load('src/index.ts');
   assert.ok(host.panels.has('mapper'), 'registers its panel');
-  assert.equal(host.panels.get('mapper').show, 'auto');
+  assert.equal(host.panels.get('mapper').show, 'always');
   for (const id of ['mapper.open', 'focus.mapper', 'mapper.copyLua', 'mapper.pause', 'mapper.stop']) assert.ok(host.commands.has(id), `command ${id}`);
   assert.deepEqual(host.commands.get('focus.mapper').keys, ['Alt+M']);
   const keys = host.settingsSchema.items.map((i) => i.key);

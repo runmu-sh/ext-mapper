@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- The panel is listed in ☰ → Views as soon as the extension is enabled in a world (`show: 'always'`); before, it
+  stayed hidden until the first room was mapped. The Show panel setting (on / auto / off) still applies.
+
 ## 0.1.0
 
 First release.

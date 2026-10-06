@@ -5539,7 +5539,7 @@ var index_default = defineExtension({
       title: COPY.title,
       defaultPosition: "right-bottom",
       order: 40,
-      show: "auto",
+      show: "always",
       mount: (el, pctx) => {
         const m = mountPanel({ mu, store: storeFor, tracker, walker, settings: panelSettings(pctx.worldId ?? "") }, el, pctx);
         mounted.set(el, m);
