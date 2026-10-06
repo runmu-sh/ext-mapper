@@ -1,0 +1,55 @@
+{
+  "format": "murec",
+  "version": 1,
+  "started": "2026-01-01T00:00:00.000Z",
+  "duration": 1200,
+  "redacted": {
+    "char": true,
+    "loginPackages": true,
+    "credentials": true
+  },
+  "events": [
+    {
+      "t": 0,
+      "seq": 1,
+      "k": "line",
+      "text": "A narrow cellar",
+      "kind": "output"
+    },
+    {
+      "t": 10,
+      "seq": 2,
+      "k": "gmcp",
+      "pkg": "Room.Info",
+      "data": {
+        "num": 1,
+        "name": "A narrow cellar",
+        "area": "Undercroft",
+        "exits": {
+          "n": 2
+        }
+      }
+    },
+    {
+      "t": 600,
+      "seq": 3,
+      "k": "line",
+      "text": "{char} goes north.",
+      "kind": "output"
+    },
+    {
+      "t": 1200,
+      "seq": 4,
+      "k": "gmcp",
+      "pkg": "Room.Info",
+      "data": {
+        "num": 2,
+        "name": "The well room",
+        "area": "Undercroft",
+        "exits": {
+          "s": 1
+        }
+      }
+    }
+  ]
+}

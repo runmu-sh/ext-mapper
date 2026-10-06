@@ -1,0 +1,92 @@
+{
+  "name": "@runmu.sh/ext-mapper",
+  "version": "0.1.0",
+  "description": "An automapper for every MUD: tracks rooms from GMCP, MSDP or the game text, draws the map, walks you there, and gives Lua its mapping API.",
+  "type": "module",
+  "exports": "./dist/index.js",
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "typecheck": "tsc --noEmit",
+    "check": "node scripts/build.mjs --check",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@muclient/sdk": "file:/tank/data/Dev/games/muClient/clients/extensions/sdk",
+    "@runmu.sh/dev": "^0.4.0",
+    "esbuild": "^0.28.2",
+    "fengari": "^0.1.5",
+    "happy-dom": "^20.0.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "muclient": {
+    "id": "mapper",
+    "api": "^1.14",
+    "publisher": "bitmuse",
+    "source": "src/index.ts",
+    "displayName": "Mapper",
+    "description": "An automapper for every MUD: tracks rooms from GMCP, MSDP or the game text, draws the map, walks you there, and gives Lua its mapping API.",
+    "contributes": {
+      "panels": [
+        {
+          "id": "mapper",
+          "title": "Mapper"
+        }
+      ],
+      "commands": [
+        {
+          "id": "mapper.open",
+          "title": "Mapper: open the map"
+        },
+        {
+          "id": "focus.mapper",
+          "title": "Go to map"
+        },
+        {
+          "id": "mapper.copyLua",
+          "title": "Mapper: copy lua library"
+        },
+        {
+          "id": "mapper.pause",
+          "title": "Mapper: pause or resume mapping"
+        },
+        {
+          "id": "mapper.stop",
+          "title": "Mapper: stop walking"
+        }
+      ],
+      "gmcp": [
+        "Room 1"
+      ]
+    },
+    "capabilities": [
+      "read-output",
+      "send-commands"
+    ],
+    "categories": [
+      "mapping"
+    ]
+  },
+  "keywords": [
+    "muclient",
+    "extension",
+    "mapper",
+    "automapper",
+    "mud",
+    "lua"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runmu-sh/ext-mapper.git"
+  }
+}
