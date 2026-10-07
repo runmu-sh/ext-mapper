@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.2
+
+- Directions: nautical forms are compass directions (`fore`/`forward`/`bow` → north, `aft`/`astern`/`stern` →
+  south, `starboard` → east, `port`/`portside`/`larboard` → west, also fused: `fore starboard`, `up aft`, `uaft`),
+  and the compound short forms `use`, `dsw`, `une`, `dn`… are parsed. Marker glyphs in exits lines (`^ up`,
+  `v down`, `→`) are ignored.
+- `in`, `out`, `enter <x>`, `board`, `leave` and `exit` open a new area named after the room reached (the exit taken
+  links the two areas) when the game names no area; setting `areaOnEnter` (on) turns this off. Ordinary moves
+  without a game-named area stay in the previous room's area.
+- Look: the toolbar now renders at the host's control size (the panel's `font: inherit` reset was overriding
+  `.sh-cmd` in the `ext` layer); bar spacing, the area select, popover menus (`.mi` rows with key hints), the
+  inspector, tag chips and the status bar follow the host's Terminal bar and context menu. Rooms are larger
+  (0.36 of a cell per half, default scale 40) so neighbours sit close; names alternate above and below along a
+  row and shrink when crowded. `docs/look.md` records the host findings and the recommendations not taken.
+
 ## 0.1.1
 
 - The panel is listed in ☰ → Views as soon as the extension is enabled in a world (`show: 'always'`); before, it

@@ -248,6 +248,9 @@ test('profiles: exit splitters, profileFor and matchHost', () => {
   assert.deepEqual(splitExits('up north, down'), [{ key: 'up north' }, { key: 'down' }], 'a compound direction stays one');
   assert.deepEqual(splitExits('north: A street, east: The gate'), [{ key: 'north' }, { key: 'east' }]);
   assert.deepEqual(splitExits('none'), []);
+  assert.deepEqual(splitExits('southeast aft ^ up'), [{ key: 'southeast' }, { key: 'aft' }, { key: 'up' }], 'a marker glyph is not an exit');
+  assert.deepEqual(splitExits('v down'), [{ key: 'down' }]);
+  assert.deepEqual(splitExits('fore, aft and starboard'), [{ key: 'fore' }, { key: 'aft' }, { key: 'starboard' }]);
   assert.equal(matchHost('underspire.net', 'underspire.net'), true);
   assert.equal(matchHost('*.underspire.net', 'play.underspire.net:4000'), true);
   assert.equal(matchHost('*.underspire.net', 'underspire.net'), false);

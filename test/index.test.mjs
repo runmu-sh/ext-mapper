@@ -29,7 +29,7 @@ test('activates: panel, commands, settings, API', async () => {
   for (const id of ['mapper.open', 'focus.mapper', 'mapper.copyLua', 'mapper.pause', 'mapper.stop']) assert.ok(host.commands.has(id), `command ${id}`);
   assert.deepEqual(host.commands.get('focus.mapper').keys, ['Alt+M']);
   const keys = host.settingsSchema.items.map((i) => i.key);
-  assert.deepEqual(keys, ['autoConnect', 'areasFromGame', 'keepDesc', 'fromText', 'walk.mode', 'walk.delayMs', 'walk.timeoutS', 'keys.focus']);
+  assert.deepEqual(keys, ['autoConnect', 'areasFromGame', 'areaOnEnter', 'keepDesc', 'fromText', 'walk.mode', 'walk.delayMs', 'walk.timeoutS', 'keys.focus']);
   assert.equal(typeof ext.api.luaLibrary(), 'string');
   assert.equal(ext.api.here('s1'), null);
   assert.equal(host.errors.length, 0, 'no handler threw');

@@ -1,6 +1,6 @@
 {
   "name": "@runmu.sh/ext-mapper",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "An automapper for every MUD: tracks rooms from GMCP, MSDP or the game text, draws the map, walks you there, and gives Lua its mapping API.",
   "type": "module",
   "exports": "./dist/index.js",

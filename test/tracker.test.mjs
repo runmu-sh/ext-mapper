@@ -278,15 +278,53 @@ test('a confirmed move wins over pending and is consumed', async () => {
   assert.deepEqual(tracker.track('s1').pending, ['e'], 'the unconfirmed e is still queued');
 });
 
-test('a move without a direction places nearby with reached via; drop forgets the track', async () => {
-  const { store, tracker } = await fresh();
+test('a move without a direction places nearby with reached via when areaOnEnter is off; drop forgets the track', async () => {
+  const { store, tracker } = await fresh({ areaOnEnter: false });
   tracker.scene(scene('Dock', ['board']));
   tracker.moved('s1', 'board');
   tracker.scene(scene('Deck', ['leave']));
   const d = here(tracker, store);
   assert.equal(d.warn, 'reached via "board"');
+  assert.equal(d.area, '', 'same area');
   assert.equal(store.room('r1').exits.board.to, d.id);
   tracker.drop('s1');
   assert.equal(tracker.track('s1'), undefined);
   assert.deepEqual(tracker.tracks(), []);
+});
+
+test('in, out, enter and board open a new area for a new room; the exit links the areas (default on)', async () => {
+  const { store, tracker } = await fresh();
+  tracker.scene(scene('Dock', ['north', 'in']));
+  tracker.moved('s1', 'in');
+  tracker.scene(scene('Cargo Hold', ['out', 'aft']));
+  const hold = here(tracker, store);
+  assert.equal(hold.area, 'cargo-hold', 'its own area, named after the room');
+  assert.equal(store.area('cargo-hold').name, 'Cargo Hold');
+  assert.deepEqual([hold.x, hold.y, hold.z], [0, 0, 0], 'anchored at the origin of the new area');
+  assert.equal(hold.warn, undefined);
+  assert.equal(store.room('r1').exits.in.to, hold.id, 'linked through in');
+  assert.equal(hold.exits.out.to, 'r1', 'the facing exit links back');
+  // Going out again finds the known room; nothing new is created.
+  tracker.moved('s1', 'out');
+  tracker.scene(scene('Dock', ['north', 'in']));
+  assert.equal(here(tracker, store).id, 'r1');
+  assert.equal(store.rooms().length, 2);
+  // `enter hatch` likewise; `aft` from the hold is ordinary movement inside the hold's area.
+  tracker.moved('s1', 'in');
+  tracker.scene(scene('Cargo Hold', ['out', 'aft']));
+  tracker.moved('s1', 'aft');
+  tracker.scene(scene('Aft Hold', ['fore']));
+  const aftHold = here(tracker, store);
+  assert.equal(aftHold.area, 'cargo-hold');
+  assert.deepEqual([aftHold.x, aftHold.y], [0, 1], 'aft is south');
+  assert.equal(aftHold.exits.fore.to, hold.id, 'fore faces aft');
+  tracker.moved('s1', 'enter hatch');
+  tracker.scene(scene('Airlock', ['exit']));
+  assert.equal(here(tracker, store).area, 'airlock');
+  // A named area from the game wins over the room-named one.
+  tracker.moved('s1', 'exit');
+  tracker.scene(scene('Aft Hold', ['fore']));
+  tracker.moved('s1', 'in');
+  tracker.scene(scene('Locker', ['out'], { area: 'Ship Interior' }));
+  assert.equal(here(tracker, store).area, 'ship-interior');
 });

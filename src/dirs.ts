@@ -53,31 +53,43 @@ function norm(raw: string): string {
 
 const VERT_WORDS: Record<string, 'up' | 'down'> = { up: 'up', u: 'up', down: 'down', d: 'down' };
 
+/**
+ * Nautical and vehicle directions, as ship, station and spacecraft games use them: fore is north, aft south,
+ * starboard east, port west. They parse to the compass Dir, so `aft` draws, links and walks as `south` does.
+ */
+export const NAUTICAL: Readonly<Record<string, Compass>> = Object.freeze({
+  fore: 'north', forward: 'north', fwd: 'north', bow: 'north',
+  aft: 'south', astern: 'south', abaft: 'south', stern: 'south',
+  starboard: 'east', stbd: 'east',
+  port: 'west', portside: 'west', larboard: 'west',
+});
+
 function compass(word: string): Dir | undefined {
-  const d = BY_NAME.get(word) ?? BY_SHORT.get(word);
+  const d = BY_NAME.get(NAUTICAL[word] ?? word) ?? BY_SHORT.get(word);
   return d && d.dz === 0 && (d.dx !== 0 || d.dy !== 0) ? d : undefined;
 }
 
 /**
  * Parse a direction in any accepted form: `north`, `n`, `northeast`, `ne`, `up`, `u`, `in`, `out`,
- * `up northwest`, `up-northwest`, `up_nw`, `unw`, `dne`, `down east`. Anything else is null.
+ * `up northwest`, `up-northwest`, `up_nw`, `unw`, `use`, `dsw`, `down east`, and the nautical `fore`, `aft`,
+ * `starboard`, `port` (also `fore starboard`, `up aft`, `uaft`). Anything else is null.
  */
 export function parseDir(raw: string): Dir | null {
   if (typeof raw !== 'string') return null;
   const s = norm(raw);
   if (!s) return null;
-  const whole = BY_NAME.get(s) ?? BY_SHORT.get(s);
+  const whole = BY_NAME.get(s) ?? BY_SHORT.get(s) ?? compass(s);
   if (whole) return whole;
   const words = s.split(' ');
   if (words.length === 3) {
     // `up north east`
     const v = VERT_WORDS[words[0]];
-    const c = compass(words[1] + words[2]);
+    const c = compass(words[1] + words[2]) ?? compass((NAUTICAL[words[1]] ?? words[1]) + (NAUTICAL[words[2]] ?? words[2]));
     return v && c ? BY_NAME.get(`${v} ${c.name}`) ?? null : null;
   }
   if (words.length === 2) {
-    // `north east` (a split compass name), or a vertical and a compass part: `up ne`, `u northwest`.
-    const fused = compass(words[0] + words[1]);
+    // `north east` (a split compass name), `fore starboard`, or a vertical and a compass part: `up ne`, `u northwest`.
+    const fused = compass(words[0] + words[1]) ?? compass((NAUTICAL[words[0]] ?? words[0]) + (NAUTICAL[words[1]] ?? words[1]));
     if (fused) return fused;
     const v = VERT_WORDS[words[0]];
     const c = compass(words[1]);

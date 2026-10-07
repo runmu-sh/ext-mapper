@@ -44,6 +44,8 @@ const COPY = {
     autoConnectHint: 'a new room links to the room next to it when their exits face each other',
     areasFromGame: 'Group rooms by the area the game names',
     areasFromGameHint: 'off: every room goes in one area',
+    areaOnEnter: 'New area for in, out, enter, board and leave',
+    areaOnEnterHint: 'a room first reached by going in or out, or by enter, board, leave or exit, starts its own area; off: it is placed beside the previous room',
     keepDesc: 'Keep room descriptions in the map',
     keepDescHint: 'descriptions make rooms easier to tell apart in games without room ids, and make the map larger',
     fromText: 'Read moves and exits from the game text',
@@ -74,6 +76,7 @@ export default defineExtension({
       items: [
         { key: 'autoConnect', label: COPY.settings.autoConnect, default: true, kind: 'toggle', scope: 'both', group: 'Mapping', hint: COPY.settings.autoConnectHint },
         { key: 'areasFromGame', label: COPY.settings.areasFromGame, default: true, kind: 'toggle', scope: 'both', group: 'Mapping', hint: COPY.settings.areasFromGameHint },
+        { key: 'areaOnEnter', label: COPY.settings.areaOnEnter, default: true, kind: 'toggle', scope: 'both', group: 'Mapping', hint: COPY.settings.areaOnEnterHint },
         { key: 'keepDesc', label: COPY.settings.keepDesc, default: true, kind: 'toggle', scope: 'both', group: 'Mapping', hint: COPY.settings.keepDescHint },
         { key: 'fromText', label: COPY.settings.fromText, default: true, kind: 'toggle', scope: 'both', group: 'Mapping', hint: COPY.settings.fromTextHint },
         { key: 'walk.mode', label: COPY.settings.walkMode, default: 'step', kind: 'select', scope: 'both', group: 'Walking',

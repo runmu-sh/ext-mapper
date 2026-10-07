@@ -79,12 +79,13 @@ export function itemsMenu(ctx: PanelCtx, x: number, y: number, items: MenuItem[]
   return popover(ctx, x, y, (el, close) => {
     for (const it of items) {
       if (it.sep) { el.append(h('div', { class: 'mu-map-pop-sep', role: 'separator' })); continue; }
-      const cls = [css.cmd, it.warn ? css.warn : '', it.on ? css.on : ''].filter(Boolean).join(' ');
+      // Rows are the host's menu items (`.mi`, as the ☰ Views and context menus draw them), not bracketed commands.
+      const cls = ['mi', it.warn ? css.warn : '', it.on ? css.on : ''].filter(Boolean).join(' ');
       el.append(h('button', {
         class: cls, type: 'button', role: 'menuitem', disabled: it.disabled ? true : undefined,
         'aria-pressed': it.on === undefined ? undefined : it.on ? 'true' : 'false',
         onclick: () => { close(); it.run?.(); },
-      }, it.label, it.hint ? h('span', { class: 'mu-map-pop-hint' }, it.hint) : null));
+      }, h('span', { class: 'mu-map-mi-label' }, it.label), it.hint ? h('span', { class: 'k' }, it.hint) : null));
     }
   }, { label });
 }

@@ -45,7 +45,11 @@ export function splitExits(list: string): Array<{ key: string; name?: string }> 
     part = part.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/^(?:the|a|an)\s+/i, '').replace(/^-\s*/, '').trim();
     part = part.replace(/^(.+?):\s*.+$/, '$1'); // `north: A street` (Diku `exits` tables) → north
     if (!part || /^(?:none|nothing|no exits?|nowhere)$/i.test(part)) continue;
-    const words = part.toLowerCase().split(/\s+/);
+    // Marker glyphs between directions (`aft ^ up`, `v down`, `→ east`) are not exits: a single character that is
+    // not itself a direction is dropped.
+    const words = part.toLowerCase().split(/\s+/).filter((w) => /[a-z0-9]/.test(w) && (w.length > 1 || parseDir(w)));
+    if (!words.length) continue;
+    part = words.join(' ');
     // `north east south` (Diku's `[Exits: n e s]`): a run of plain directions is several exits, not one name.
     if (words.length > 1 && words.every((w) => parseDir(w)) && !parseDir(part)) { for (const w of words) push(w); continue; }
     push(part.toLowerCase());

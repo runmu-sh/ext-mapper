@@ -13,6 +13,10 @@ A [μClient](https://runmu.sh) extension: `@runmu.sh/ext-mapper`, id `mapper`, A
   queued and resolved as the room text arrives; refusals ("The gate is closed.") drop the pending move.
 - **Places and links** new rooms next to the room you came from, in the direction you went, and connects facing
   exits automatically (optional). Areas from the game become separate coordinate spaces; floors are `z`.
+  Directions are read in every usual form — `north`/`n`, `up southeast`/`use`, `dsw` — and in the nautical set
+  ship and station games use: `fore`/`aft`/`starboard`/`port` (also `forward`, `stern`, `stbd`, `portside`) map to
+  north/south/east/west. `in`, `out`, `enter …`, `board`, `leave` have no place on the grid: a room first reached
+  that way opens its own area, named after the room, and the exit links the two areas (setting `areaOnEnter`).
 - **Areas** group rooms. The `Areas` dialog (toolbar button or `A`) lists them with room counts, creates, renames,
   colours, annotates and deletes them (moving the rooms out or deleting them), moves the selection in, and lists
   every exit into another area. Uncoloured rooms take their area's colour as a tint; exits that cross into another
@@ -56,6 +60,7 @@ Commands (palette): `mapper.open`, `focus.mapper` (Alt+M), `mapper.copyLua`, `ma
 |---|---|---|
 | `autoConnect` | on | link facing exits of neighbouring rooms as they are created |
 | `areasFromGame` | on | make an area per `Room.Info.area` (off: one area) |
+| `areaOnEnter` | on | a new room reached by `in`/`out`/`enter`/`board`/`leave` starts its own area (off: placed beside the previous room) |
 | `keepDesc` | on | store room descriptions (bigger map, better matching without GMCP) |
 | `fromText` | on | read room text and exits lines when the game has no GMCP/MSDP room data |
 | `walk.mode` | step | `step` or `burst` |

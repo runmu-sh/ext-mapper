@@ -4,6 +4,7 @@
  * the pick state are not. `cellAt` / `pointOf` map between CSS px of the canvas and map cells.
  */
 import type { Store } from '@muclient/sdk';
+import { ROOM_HALF } from './render';
 
 export interface ViewState {
   /** Centre of the view in cell units. */
@@ -33,7 +34,8 @@ export interface PickState {
 
 export const MIN_SCALE = 8;
 export const MAX_SCALE = 120;
-export const DEFAULT_SCALE = 34;
+/** Px per cell at first: a 29px room with an 11px link between neighbours (ROOM_HALF 0.36). */
+export const DEFAULT_SCALE = 40;
 
 export const DEFAULT_VIEW: ViewState = {
   cx: 0, cy: 0, scale: DEFAULT_SCALE, z: 0, area: '', follow: true, mode: 'walk', names: false, details: true,
@@ -125,8 +127,8 @@ export class View {
     return { x: this.state.cx + (px - this.width / 2) / s, y: this.state.cy + (py - this.height / 2) / s };
   }
 
-  /** Whether (px, py) falls within the square of the room at cell (x, y), half-size `half` cells. */
-  hitsRoom(px: number, py: number, x: number, y: number, half = 0.27): boolean {
+  /** Whether (px, py) falls within the square of the room at cell (x, y), half-size `half` cells (the drawn square by default). */
+  hitsRoom(px: number, py: number, x: number, y: number, half = ROOM_HALF): boolean {
     const c = this.cellAtExact(px, py);
     return Math.abs(c.x - x) <= half && Math.abs(c.y - y) <= half;
   }

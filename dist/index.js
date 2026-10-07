@@ -46,24 +46,39 @@ function norm(raw) {
   return raw.toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
 }
 var VERT_WORDS = { up: "up", u: "up", down: "down", d: "down" };
+var NAUTICAL = Object.freeze({
+  fore: "north",
+  forward: "north",
+  fwd: "north",
+  bow: "north",
+  aft: "south",
+  astern: "south",
+  abaft: "south",
+  stern: "south",
+  starboard: "east",
+  stbd: "east",
+  port: "west",
+  portside: "west",
+  larboard: "west"
+});
 function compass(word) {
-  const d = BY_NAME.get(word) ?? BY_SHORT.get(word);
+  const d = BY_NAME.get(NAUTICAL[word] ?? word) ?? BY_SHORT.get(word);
   return d && d.dz === 0 && (d.dx !== 0 || d.dy !== 0) ? d : void 0;
 }
 function parseDir(raw) {
   if (typeof raw !== "string") return null;
   const s = norm(raw);
   if (!s) return null;
-  const whole = BY_NAME.get(s) ?? BY_SHORT.get(s);
+  const whole = BY_NAME.get(s) ?? BY_SHORT.get(s) ?? compass(s);
   if (whole) return whole;
   const words = s.split(" ");
   if (words.length === 3) {
     const v = VERT_WORDS[words[0]];
-    const c = compass(words[1] + words[2]);
+    const c = compass(words[1] + words[2]) ?? compass((NAUTICAL[words[1]] ?? words[1]) + (NAUTICAL[words[2]] ?? words[2]));
     return v && c ? BY_NAME.get(`${v} ${c.name}`) ?? null : null;
   }
   if (words.length === 2) {
-    const fused = compass(words[0] + words[1]);
+    const fused = compass(words[0] + words[1]) ?? compass((NAUTICAL[words[0]] ?? words[0]) + (NAUTICAL[words[1]] ?? words[1]));
     if (fused) return fused;
     const v = VERT_WORDS[words[0]];
     const c = compass(words[1]);
@@ -373,11 +388,11 @@ function dijkstra(rooms, from, to, opts = {}) {
   if (!done.has(to)) return null;
   const ids = [];
   const steps = [];
-  for (let at = to; at !== from; ) {
-    const p = prev.get(at);
-    ids.unshift(at);
+  for (let at2 = to; at2 !== from; ) {
+    const p = prev.get(at2);
+    ids.unshift(at2);
     steps.unshift([...p.steps]);
-    at = p.id;
+    at2 = p.id;
   }
   return { ids, steps, cost: dist.get(to) };
 }
@@ -1077,6 +1092,7 @@ var lc = (s) => (s ?? "").trim().toLowerCase();
 var sameName = (a, b) => lc(a) === lc(b);
 var atCell = (r, c) => r.area === c.area && r.x === c.x && r.y === c.y && r.z === c.z;
 var zero = (d) => d.dx === 0 && d.dy === 0 && d.dz === 0;
+var ENTER_VERB = /^(?:go\s+)?(?:enter|board|embark|disembark|leave|exit)(?:\s|$)/i;
 function exitFor(room, key) {
   const k = lc(key);
   if (!k) return void 0;
@@ -1218,8 +1234,8 @@ function createTracker(opts) {
       }
       let pick = best[0];
       if (best.length > 1 && expected) {
-        const at = store.at(expected.area, expected.x, expected.y, expected.z);
-        if (at && best.includes(at.id)) pick = at.id;
+        const at2 = store.at(expected.area, expected.x, expected.y, expected.z);
+        if (at2 && best.includes(at2.id)) pick = at2.id;
       }
       return { room: store.room(pick), by: "fingerprint" };
     }
@@ -1227,8 +1243,8 @@ function createTracker(opts) {
     let cands = (input.desc ? store.bySig(sig) : byName()).filter(ok);
     if (!cands.length && input.desc) cands = byName().filter((r) => !r.desc).filter(ok);
     if (cands.length) {
-      const at = expected ? cands.find((c) => atCell(c, expected)) : void 0;
-      if (at) return { room: at, by: "signature" };
+      const at2 = expected ? cands.find((c) => atCell(c, expected)) : void 0;
+      if (at2) return { room: at2, by: "signature" };
       const via = used?.to ? cands.find((c) => c.id === used.to) : void 0;
       if (via) return { room: via, by: "signature" };
       if (input.desc) {
@@ -1306,7 +1322,10 @@ function createTracker(opts) {
     const used = prev && key !== null ? exitFor(prev, key) : void 0;
     const dir = (key !== null ? parseDir(key) : null) ?? (used?.dir ? parseDir(used.dir) : null);
     const areasFromGame = setting("areasFromGame", t.worldId, true);
-    const areaId = areasFromGame && input.area ? slug(input.area) : "";
+    let areaId = areasFromGame && input.area ? slug(input.area) : "";
+    const enters = prev !== null && key !== null && !input.coords && !(areasFromGame && input.area) && (dir ? zero(dir) : ENTER_VERB.test(key));
+    const newArea2 = enters && setting("areaOnEnter", t.worldId, true) ? input.name : null;
+    if (!areaId && prev && !enters) areaId = prev.area;
     const sig = sigOf(input.name, input.desc);
     let expected = null;
     if (input.coords) expected = { area: areaId, ...input.coords };
@@ -1344,9 +1363,10 @@ function createTracker(opts) {
     store.batch("move", () => {
       if (areaId && areasFromGame && input.area && !store.area(areaId)) store.setArea({ id: areaId, name: input.area });
       if (found) {
-        adopt(store, t, found.room, input, areaId);
+        adopt(store, t, found.room, input, areasFromGame && input.area ? areaId : found.room.area);
         dest = store.room(found.room.id);
       } else {
+        if (newArea2 !== null) areaId = store.createArea(newArea2).id;
         const { cell, warn } = placeNew(store, input, areaId, prev, dir, key);
         dest = createFor(store, t, input, cell, warn);
         created = true;
@@ -1594,13 +1614,13 @@ function createWalker(opts) {
         return;
       }
       void opts.send(sid, w.flat[w.flatAt++]);
-      let n = 0, at = 0;
-      while (at < w.hops.length && n + w.hops[at].length <= w.flatAt) {
-        n += w.hops[at].length;
-        at++;
+      let n = 0, at2 = 0;
+      while (at2 < w.hops.length && n + w.hops[at2].length <= w.flatAt) {
+        n += w.hops[at2].length;
+        at2++;
       }
-      if (at !== w.state.at) {
-        w.state = { ...w.state, at };
+      if (at2 !== w.state.at) {
+        w.state = { ...w.state, at: at2 };
         announce(sid, w);
       }
       if (w.flatAt >= w.flat.length) {
@@ -1908,7 +1928,9 @@ function splitExits(list) {
     part = part.replace(/\s*\([^)]*\)\s*/g, " ").replace(/^(?:the|a|an)\s+/i, "").replace(/^-\s*/, "").trim();
     part = part.replace(/^(.+?):\s*.+$/, "$1");
     if (!part || /^(?:none|nothing|no exits?|nowhere)$/i.test(part)) continue;
-    const words = part.toLowerCase().split(/\s+/);
+    const words = part.toLowerCase().split(/\s+/).filter((w) => /[a-z0-9]/.test(w) && (w.length > 1 || parseDir(w)));
+    if (!words.length) continue;
+    part = words.join(" ");
     if (words.length > 1 && words.every((w) => parseDir(w)) && !parseDir(part)) {
       for (const w of words) push(w);
       continue;
@@ -2149,13 +2171,17 @@ var P = '.ext-panel[data-ext="mapper"] .mu-map';
 var PANEL_CSS = `
 ${P} { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg-elev); color: var(--fg); font-family: var(--font-mono); font-size: var(--shell-font-size, 15px); }
 ${P} * { box-sizing: border-box; }
-${P} button, ${P} input, ${P} select, ${P} textarea { font: inherit; }
+/* No \`font: inherit\` on controls here: this sheet is in the \`ext\` layer and would beat the host's \`.sh-cmd\` /
+   \`.sh-toggle\` sizes (.68rem). The host's base.css already resets control fonts in the \`mu\` layer. */
 
-${P} .mu-map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; padding: 4px 8px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
-${P} .mu-map-bar .mu-map-group { display: inline-flex; align-items: center; gap: 1px; }
+/* The toolbar matches the Terminal's "Output filters and tools" bar (TerminalPanel.vue .logbar): 6px gap, 3px 8px padding. */
+${P} .mu-map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 8px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
+${P} .mu-map-bar .mu-map-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; }
 ${P} .mu-map-bar .mu-map-gap { flex: 1; }
-${P} .mu-map-bar select { min-height: 24px; max-width: 10em; background: var(--bg); color: var(--fg); border: 1px solid var(--border-bright); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; padding: 0 .5ch; }
-${P} .mu-map-bar .mu-map-z { display: inline-block; min-width: 3ch; text-align: center; color: var(--gold); font-size: .68rem; letter-spacing: .1em; }
+/* The area select is an underline field (.sh-field, as the host's Hotbar edit cells draw a select) at the bar's type size. */
+${P} .mu-map-bar select { min-height: 24px; max-width: 10em; padding: 0 .5ch; background: var(--bg-elev); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-dim); cursor: pointer; }
+${P} .mu-map-bar select:hover { color: var(--accent-bright); }
+${P} .mu-map-bar .mu-map-z { display: inline-block; min-width: 3ch; text-align: center; color: var(--gold); font-size: .68rem; letter-spacing: .14em; }
 
 ${P} .mu-map-body { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 ${P} .mu-map-stage { position: relative; flex: 1; min-height: 60px; background: var(--bg); overflow: hidden; }
@@ -2176,11 +2202,16 @@ ${P} .mu-map-tip .mu-map-tip-dim { color: var(--fg-dim); }
 ${P} .mu-map-tip .mu-map-tip-warn { color: var(--alert); }
 ${P} .mu-map-tip .mu-map-tip-walk { color: var(--gold); font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; }
 
-${P} .mu-map-pop { position: absolute; z-index: 20; min-width: 9rem; max-width: 18rem; max-height: 70%; overflow: auto; display: flex; flex-direction: column; align-items: stretch; padding: 3px 0; background: var(--bg-elev); border: 1px solid var(--accent); }
+/* Popovers are the host's dropdown (.drop in controls.css: --bg-elev, a 1px --accent edge, --menu-shadow); menu rows
+   are the host's .mi with its .k key hint (ContextMenu.vue), dialogs (Legend, Controls, Areas) hold a title and body. */
+${P} .mu-map-pop { position: absolute; z-index: 20; min-width: 12rem; max-width: 18rem; max-height: 70%; overflow: auto; display: flex; flex-direction: column; align-items: stretch; padding: 0; background: var(--bg-elev); border: 1px solid var(--accent); box-shadow: var(--menu-shadow); }
+${P} .mu-map-pop .mi { justify-content: space-between; gap: 1.2rem; min-height: 24px; width: 100%; }
+${P} .mu-map-pop .mi .mu-map-mi-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+${P} .mu-map-pop .mi:disabled { color: var(--fg-faint); background: none; pointer-events: none; }
 ${P} .mu-map-pop .cmd, ${P} .mu-map-pop .sh-cmd, ${P} .mu-map-pop .tool { justify-content: flex-start; width: 100%; padding: 0 1.2ch 0 .8ch; }
 ${P} .mu-map-pop .mu-map-pop-hint { margin-left: auto; padding-left: 1.5ch; color: var(--fg-faint); font-size: .6rem; letter-spacing: .08em; }
 ${P} .mu-map-pop .mu-map-pop-sep { height: 1px; margin: 2px 0; background: var(--border); }
-${P} .mu-map-pop .mu-map-pop-title { padding: 2px .8ch; color: var(--gold); font-size: .6rem; letter-spacing: .24em; text-transform: uppercase; }
+${P} .mu-map-pop .mu-map-pop-title { padding: 6px 10px 2px; color: var(--fg-faint); font-size: .6rem; letter-spacing: .2em; text-transform: uppercase; }
 ${P} .mu-map-pop .mu-map-pop-body { padding: 4px 1ch 6px; font-size: .74rem; line-height: 1.5; color: var(--fg-dim); }
 ${P} .mu-map-pop .mu-map-pop-body dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 1.2ch; margin: 0; }
 ${P} .mu-map-pop .mu-map-pop-body dt { color: var(--fg); white-space: nowrap; display: flex; align-items: center; gap: .6ch; }
@@ -2188,11 +2219,15 @@ ${P} .mu-map-pop .mu-map-pop-body dd { margin: 0; }
 ${P} .mu-map-pop .mu-map-pop-body kbd { color: var(--gold); font-family: inherit; font-size: .66rem; letter-spacing: .08em; }
 ${P} .mu-map-pop svg { width: 14px; height: 14px; display: inline-block; vertical-align: middle; }
 
-${P} .mu-map-insp { flex: 0 0 auto; max-height: 40%; min-height: 0; overflow: auto; background: var(--bg-elev); border-top: 1px solid var(--border-bright); padding: 4px 10px 8px; font-size: .78rem; }
+/* The inspector is content under the stage: a --border rule (--border-bright outlines controls), the host's .82rem body size.
+   Its title is the Scene panel's (t-title: .85rem .16em UPPER --accent-bright, a --border-bright bottom rule). */
+${P} .mu-map-insp { flex: 0 0 auto; max-height: 40%; min-height: 0; overflow: auto; background: var(--bg-elev); border-top: 1px solid var(--border); padding: 4px 10px 8px; font-size: .82rem; }
 ${P} .mu-map-insp[hidden], ${P} .mu-map-banner[hidden], ${P} .mu-map [hidden] { display: none; }
 ${P} .mu-map-insp .mu-map-sec, ${P} .mu-map-area-detail .mu-map-sec { margin: .6rem 0 .3rem; }
-${P} .mu-map-insp .mu-map-title, ${P} .mu-map-area-detail .mu-map-title { display: flex; align-items: baseline; gap: 1ch; color: var(--accent-bright); font-size: .82rem; letter-spacing: .1em; padding: 4px 0 2px; }
-${P} .mu-map-insp .mu-map-title .mu-map-id, ${P} .mu-map-area-detail .mu-map-title .mu-map-id { color: var(--fg-faint); font-size: .62rem; letter-spacing: .08em; }
+${P} .mu-map-insp .mu-map-title, ${P} .mu-map-area-detail .mu-map-title { display: flex; align-items: baseline; gap: 1ch; color: var(--accent-bright); font-size: .85rem; letter-spacing: .16em; text-transform: uppercase; padding: 4px 0 3px; border-bottom: 1px solid var(--border-bright); }
+html[data-glow] ${P} .mu-map-title { text-shadow: 0 0 6px var(--glow); }
+${P} .mu-map-insp .mu-map-title .mu-map-id, ${P} .mu-map-area-detail .mu-map-title .mu-map-id { color: var(--fg-faint); font-size: .62rem; letter-spacing: .08em; text-transform: none; text-shadow: none; }
+${P} .mu-map-title .sh-plate { text-shadow: none; }
 ${P} .mu-map-insp .mu-map-meta, ${P} .mu-map-area-detail .mu-map-meta { color: var(--fg-dim); font-size: .7rem; letter-spacing: .04em; }
 ${P} .mu-map-insp .mu-map-hint, ${P} .mu-map-area-detail .mu-map-hint { color: var(--fg-faint); font-size: .64rem; letter-spacing: .14em; text-transform: uppercase; padding: 8px 0; }
 ${P} .mu-map-insp .mu-map-warn, ${P} .mu-map-area-detail .mu-map-warn { display: flex; align-items: center; gap: 1ch; color: var(--alert); font-size: .7rem; padding: 2px 0; }
@@ -2225,8 +2260,9 @@ ${P} .mu-map-glyphs { display: flex; flex-wrap: wrap; gap: 2px; align-items: cen
 ${P} .mu-map-glyphs .mu-map-sym { width: 2.6ch; max-width: 3.5em; text-align: center; }
 
 ${P} .mu-map-chips { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
-${P} .mu-map-chip { display: inline-flex; align-items: center; gap: .4ch; min-height: 24px; padding: 0 .4ch 0 .8ch; border: 1px solid var(--border); color: var(--fg); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; }
-${P} .mu-map-chip button { min-width: 20px; min-height: 22px; }
+/* A tag is a dim plate (.sh-plate.dim: a --border-bright hairline, t-micro) with its \xD7 inside. */
+${P} .mu-map-chip { display: inline-flex; align-items: center; gap: 0; min-height: 24px; padding: 0 0 0 .8ch; box-shadow: inset 0 0 0 1px var(--border-bright); color: var(--fg-dim); font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; }
+${P} .mu-map-chip button { min-width: 24px; min-height: 24px; }
 ${P} .mu-map-chips input { width: 8em; }
 
 ${P} .mu-map-insp textarea { width: 100%; min-height: 3.2em; resize: vertical; }
@@ -2242,7 +2278,8 @@ ${P} .mu-map-exit .mu-map-door { color: var(--fg-dim); font-size: .62rem; letter
 ${P} .mu-map-exit .mu-map-cost { width: 3.5em; min-height: 22px; }
 ${P} .mu-map-exit .mu-map-exit-tools { display: inline-flex; flex-wrap: wrap; gap: 0 2px; margin-left: auto; }
 
-${P} .mu-map-status { display: flex; align-items: center; gap: 1.2ch; padding: 2px 10px; min-height: 20px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--fg-dim); font-size: .64rem; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+/* The status line: a bar (3px 8px) of readouts in the host's readout style (.64rem .14em UPPER --fg-dim). */
+${P} .mu-map-status { display: flex; align-items: center; gap: 1.2ch; padding: 3px 8px; min-height: 24px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--fg-dim); font-size: .64rem; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
 ${P} .mu-map-status .mu-map-gap { flex: 1; }
 ${P} .mu-map-status .mu-map-status-msg { color: var(--gold); overflow: hidden; text-overflow: ellipsis; }
 ${P} .mu-map-status .mu-map-status-warn { color: var(--alert); }
@@ -2279,196 +2316,11 @@ html[data-calm] ${P} *, ${P} .mu-map-calm * { transition: none !important; }
 @media (prefers-reduced-motion: reduce) { ${P} * { transition: none !important; } }
 `;
 
-// src/panel/view.ts
-var MIN_SCALE = 8;
-var MAX_SCALE = 120;
-var DEFAULT_SCALE = 34;
-var STORAGE_KEY = "view";
-var SAVE_DELAY_MS2 = 400;
-function clean(v) {
-  const o = v && typeof v === "object" ? v : {};
-  const num4 = (k, fb) => typeof o[k] === "number" && Number.isFinite(o[k]) ? o[k] : fb;
-  const bool2 = (k, fb) => typeof o[k] === "boolean" ? o[k] : fb;
-  return {
-    cx: num4("cx", 0),
-    cy: num4("cy", 0),
-    scale: Math.min(MAX_SCALE, Math.max(MIN_SCALE, num4("scale", DEFAULT_SCALE))),
-    z: Math.round(num4("z", 0)),
-    area: typeof o.area === "string" ? o.area : "",
-    follow: bool2("follow", true),
-    mode: o.mode === "edit" ? "edit" : "walk",
-    names: bool2("names", false),
-    details: bool2("details", true)
-  };
-}
-var View = class {
-  constructor(store) {
-    this.store = store;
-    this.state = clean(store?.get(STORAGE_KEY));
-  }
-  store;
-  state;
-  /** Selected room ids (edit mode). Not persisted. */
-  selection = /* @__PURE__ */ new Set();
-  pick = null;
-  /** The canvas size in CSS px, set by the panel on resize. */
-  width = 300;
-  height = 200;
-  saveTimer = null;
-  listeners = /* @__PURE__ */ new Set();
-  /** Change the view; persists (debounced) and notifies. */
-  set(patch) {
-    let changed = false;
-    for (const k of Object.keys(patch)) {
-      const v = patch[k];
-      if (v !== void 0 && this.state[k] !== v) {
-        this.state[k] = v;
-        changed = true;
-      }
-    }
-    if (!changed) return;
-    this.state.scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.state.scale));
-    this.scheduleSave();
-    this.emit();
-  }
-  onChange(fn) {
-    this.listeners.add(fn);
-    return () => {
-      this.listeners.delete(fn);
-    };
-  }
-  emit() {
-    for (const f of [...this.listeners]) f();
-  }
-  scheduleSave() {
-    if (!this.store) return;
-    if (this.saveTimer) clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
-      this.saveTimer = null;
-      this.saveNow();
-    }, SAVE_DELAY_MS2);
-  }
-  /** Write the view state now (on unmount). */
-  saveNow() {
-    if (this.saveTimer) {
-      clearTimeout(this.saveTimer);
-      this.saveTimer = null;
-    }
-    try {
-      this.store?.set(STORAGE_KEY, { ...this.state });
-    } catch {
-    }
-  }
-  /* ── coordinates ── */
-  /** The CSS px of the centre of cell (x, y). */
-  pointOf(x, y) {
-    const s = this.state.scale;
-    return { px: this.width / 2 + (x - this.state.cx) * s, py: this.height / 2 + (y - this.state.cy) * s };
-  }
-  /** The cell under CSS px (px, py) (the nearest cell centre). */
-  cellAt(px, py) {
-    const s = this.state.scale;
-    return { x: Math.round(this.state.cx + (px - this.width / 2) / s), y: Math.round(this.state.cy + (py - this.height / 2) / s) };
-  }
-  /** The cell under CSS px without rounding (for hit tests against a room square). */
-  cellAtExact(px, py) {
-    const s = this.state.scale;
-    return { x: this.state.cx + (px - this.width / 2) / s, y: this.state.cy + (py - this.height / 2) / s };
-  }
-  /** Whether (px, py) falls within the square of the room at cell (x, y), half-size `half` cells. */
-  hitsRoom(px, py, x, y, half = 0.27) {
-    const c = this.cellAtExact(px, py);
-    return Math.abs(c.x - x) <= half && Math.abs(c.y - y) <= half;
-  }
-  /** Zoom by `factor` keeping the map point under (px, py) still. */
-  zoomAt(factor, px, py) {
-    const before = this.cellAtExact(px, py);
-    const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.state.scale * factor));
-    if (scale === this.state.scale) return;
-    const cx = before.x - (px - this.width / 2) / scale;
-    const cy = before.y - (py - this.height / 2) / scale;
-    this.set({ scale, cx, cy });
-  }
-  /** Pan by CSS px. */
-  panBy(dxPx, dyPx) {
-    const s = this.state.scale;
-    this.set({ cx: this.state.cx - dxPx / s, cy: this.state.cy - dyPx / s });
-  }
-  /** Centre on a cell, optionally switching floor and area. */
-  centreOn(x, y, z, area) {
-    const patch = { cx: x, cy: y };
-    if (z !== void 0) patch.z = z;
-    if (area !== void 0) patch.area = area;
-    this.set(patch);
-  }
-  /** Scale and centre so every given cell is visible with a margin. */
-  fitTo(cells, maxScale = 60) {
-    if (!cells.length) return;
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const c of cells) {
-      x0 = Math.min(x0, c.x);
-      y0 = Math.min(y0, c.y);
-      x1 = Math.max(x1, c.x);
-      y1 = Math.max(y1, c.y);
-    }
-    const w = x1 - x0 + 2, hgt = y1 - y0 + 2;
-    const scale = Math.min(maxScale, Math.max(MIN_SCALE, Math.floor(Math.min(this.width / w, this.height / hgt))));
-    this.set({ cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, scale });
-  }
-  /** Whether a cell is on screen (with a margin of `pad` cells inside the edge). */
-  isVisible(x, y, pad = 0.5) {
-    const p = this.pointOf(x, y);
-    const m = pad * this.state.scale;
-    return p.px >= m && p.py >= m && p.px <= this.width - m && p.py <= this.height - m;
-  }
-  /* ── selection ── */
-  select(ids, add = false) {
-    if (!add) this.selection.clear();
-    for (const id of ids) this.selection.add(id);
-    this.emit();
-  }
-  toggleSelect(id) {
-    if (this.selection.has(id)) this.selection.delete(id);
-    else this.selection.add(id);
-    this.emit();
-  }
-  clearSelection() {
-    if (!this.selection.size) return;
-    this.selection.clear();
-    this.emit();
-  }
-  /** The single selected room id, or null. */
-  single() {
-    return this.selection.size === 1 ? [...this.selection][0] : null;
-  }
-  setPick(p) {
-    this.pick = p;
-    this.emit();
-  }
-  /** The hot-reload snapshot. */
-  snapshot() {
-    return { view: { ...this.state }, selection: [...this.selection] };
-  }
-  restore(s) {
-    if (!s || typeof s !== "object") return;
-    const o = s;
-    if (o.view) this.state = clean({ ...this.state, ...o.view });
-    if (Array.isArray(o.selection)) {
-      this.selection.clear();
-      for (const id of o.selection) if (typeof id === "string") this.selection.add(id);
-    }
-    this.emit();
-  }
-  dispose() {
-    this.saveNow();
-    this.listeners.clear();
-  }
-};
-
 // src/panel/render.ts
-var ROOM_HALF = 0.27;
+var ROOM_HALF = 0.36;
+var STUB_LEN = 0.11;
 var GRID_MIN_SCALE = 22;
-var NAMES_MIN_SCALE = 40;
+var NAMES_MIN_SCALE = 44;
 var CHIP_MIN_SCALE = 44;
 function parseHex(c) {
   const m = /^#([0-9a-f]{3,8})$/i.exec(c.trim());
@@ -2721,7 +2573,7 @@ function drawDecor(ctx, room, scene, px, py, half) {
 }
 function drawStub(ctx, cx, cy, dx, dy, half, s, t, filled, diagonalFloor) {
   const a = edgePoint(cx, cy, dx, dy, half);
-  const len = Math.max(4, s * 0.2);
+  const len = Math.max(3, s * STUB_LEN);
   const n = Math.hypot(dx, dy) || 1;
   const ex = a.x + dx / n * len, ey = a.y + dy / n * len;
   ctx.strokeStyle = t.fgDim;
@@ -2731,7 +2583,7 @@ function drawStub(ctx, cx, cy, dx, dy, half, s, t, filled, diagonalFloor) {
   ctx.moveTo(a.x, a.y);
   ctx.lineTo(ex, ey);
   ctx.stroke();
-  const r = Math.max(2, s * 0.07);
+  const r = Math.max(2, s * 0.06);
   ctx.beginPath();
   ctx.arc(ex + dx / n * r, ey + dy / n * r, r, 0, Math.PI * 2);
   if (filled) {
@@ -2741,8 +2593,8 @@ function drawStub(ctx, cx, cy, dx, dy, half, s, t, filled, diagonalFloor) {
     ctx.stroke();
   }
   if (diagonalFloor) {
-    const tr = r * 1.2;
-    const tx = ex + dx / n * r * 3, ty = ey + dy / n * r * 3;
+    const tr = r;
+    const tx = ex + dx / n * r * 2.4, ty = ey + dy / n * r * 2.4;
     ctx.fillStyle = t.fgDim;
     ctx.beginPath();
     ctx.moveTo(tx, ty - tr);
@@ -2818,19 +2670,39 @@ function drawName(ctx, room, scene, px, py, half) {
   const show = room.id === scene.hover || single || view.names && s >= NAMES_MIN_SCALE;
   if (!show || !room.name) return;
   const cx = px(room.x), cy = py(room.y);
-  const size = Math.max(9, Math.min(13, Math.round(s * 0.26)));
+  const size = Math.max(9, Math.min(12, Math.round(s * 0.22)));
   ctx.font = `${size}px ${scene.fontFamily}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  const maxW = Math.max(60, Math.min(180, s * 3.4));
+  const left = at(scene, room.x - 1, room.y), right = at(scene, room.x + 1, room.y);
+  const row = left !== null || right !== null;
+  const above = labelsAbove(scene, room) && !single && room.id !== scene.hover;
+  const crowded = left !== null && labelsAbove(scene, left) === above || right !== null && labelsAbove(scene, right) === above;
+  const maxW = Math.max(crowded ? 36 : 60, Math.min(180, crowded ? s - 6 : row ? s * 2 - 10 : s * 3.4));
   const label = ellipsise(ctx, room.name, maxW);
   const tw = ctx.measureText(label).width + 6;
-  const th = size + 4;
-  const y = cy + half + 3;
+  const th = size + 2;
+  const y = above ? cy - half - 1 - th : cy + half + 1;
   ctx.fillStyle = withAlpha(t.bgDeep, 0.9);
   ctx.fillRect(cx - tw / 2, y, tw, th);
   ctx.fillStyle = room.id === scene.currentId ? t.accentBright : t.fg;
-  ctx.fillText(label, cx, y + 2);
+  ctx.fillText(label, cx, y + 1);
+}
+function occupied(scene, room, dx, dy) {
+  return at(scene, room.x + dx, room.y + dy, room) !== null;
+}
+function at(scene, x, y, not) {
+  for (const r of scene.rooms) if (r.x === x && r.y === y && r !== not) return r;
+  return null;
+}
+function labelsAbove(scene, room) {
+  if (occupied(scene, room, 0, -1)) return false;
+  if (occupied(scene, room, 0, 1)) return true;
+  const left = at(scene, room.x - 1, room.y), right = at(scene, room.x + 1, room.y);
+  if (left === null && right === null) return false;
+  const blocked = (r) => r !== null && at(scene, r.x, r.y - 1) !== null;
+  if (blocked(left) || blocked(right)) return true;
+  return Math.abs(room.x + room.y) % 2 === 1;
 }
 function drawDrag(ctx, drag, t, px, py, half) {
   ctx.strokeStyle = t.accent;
@@ -2857,6 +2729,192 @@ function drawEmpty(ctx, w, h, scene) {
   ctx.textBaseline = "middle";
   ctx.fillText((scene.emptyMessage ?? "").toUpperCase().split("").join(" "), w / 2, h / 2);
 }
+
+// src/panel/view.ts
+var MIN_SCALE = 8;
+var MAX_SCALE = 120;
+var DEFAULT_SCALE = 40;
+var STORAGE_KEY = "view";
+var SAVE_DELAY_MS2 = 400;
+function clean(v) {
+  const o = v && typeof v === "object" ? v : {};
+  const num4 = (k, fb) => typeof o[k] === "number" && Number.isFinite(o[k]) ? o[k] : fb;
+  const bool2 = (k, fb) => typeof o[k] === "boolean" ? o[k] : fb;
+  return {
+    cx: num4("cx", 0),
+    cy: num4("cy", 0),
+    scale: Math.min(MAX_SCALE, Math.max(MIN_SCALE, num4("scale", DEFAULT_SCALE))),
+    z: Math.round(num4("z", 0)),
+    area: typeof o.area === "string" ? o.area : "",
+    follow: bool2("follow", true),
+    mode: o.mode === "edit" ? "edit" : "walk",
+    names: bool2("names", false),
+    details: bool2("details", true)
+  };
+}
+var View = class {
+  constructor(store) {
+    this.store = store;
+    this.state = clean(store?.get(STORAGE_KEY));
+  }
+  store;
+  state;
+  /** Selected room ids (edit mode). Not persisted. */
+  selection = /* @__PURE__ */ new Set();
+  pick = null;
+  /** The canvas size in CSS px, set by the panel on resize. */
+  width = 300;
+  height = 200;
+  saveTimer = null;
+  listeners = /* @__PURE__ */ new Set();
+  /** Change the view; persists (debounced) and notifies. */
+  set(patch) {
+    let changed = false;
+    for (const k of Object.keys(patch)) {
+      const v = patch[k];
+      if (v !== void 0 && this.state[k] !== v) {
+        this.state[k] = v;
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    this.state.scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.state.scale));
+    this.scheduleSave();
+    this.emit();
+  }
+  onChange(fn) {
+    this.listeners.add(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
+  }
+  emit() {
+    for (const f of [...this.listeners]) f();
+  }
+  scheduleSave() {
+    if (!this.store) return;
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      this.saveNow();
+    }, SAVE_DELAY_MS2);
+  }
+  /** Write the view state now (on unmount). */
+  saveNow() {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    try {
+      this.store?.set(STORAGE_KEY, { ...this.state });
+    } catch {
+    }
+  }
+  /* ── coordinates ── */
+  /** The CSS px of the centre of cell (x, y). */
+  pointOf(x, y) {
+    const s = this.state.scale;
+    return { px: this.width / 2 + (x - this.state.cx) * s, py: this.height / 2 + (y - this.state.cy) * s };
+  }
+  /** The cell under CSS px (px, py) (the nearest cell centre). */
+  cellAt(px, py) {
+    const s = this.state.scale;
+    return { x: Math.round(this.state.cx + (px - this.width / 2) / s), y: Math.round(this.state.cy + (py - this.height / 2) / s) };
+  }
+  /** The cell under CSS px without rounding (for hit tests against a room square). */
+  cellAtExact(px, py) {
+    const s = this.state.scale;
+    return { x: this.state.cx + (px - this.width / 2) / s, y: this.state.cy + (py - this.height / 2) / s };
+  }
+  /** Whether (px, py) falls within the square of the room at cell (x, y), half-size `half` cells (the drawn square by default). */
+  hitsRoom(px, py, x, y, half = ROOM_HALF) {
+    const c = this.cellAtExact(px, py);
+    return Math.abs(c.x - x) <= half && Math.abs(c.y - y) <= half;
+  }
+  /** Zoom by `factor` keeping the map point under (px, py) still. */
+  zoomAt(factor, px, py) {
+    const before = this.cellAtExact(px, py);
+    const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.state.scale * factor));
+    if (scale === this.state.scale) return;
+    const cx = before.x - (px - this.width / 2) / scale;
+    const cy = before.y - (py - this.height / 2) / scale;
+    this.set({ scale, cx, cy });
+  }
+  /** Pan by CSS px. */
+  panBy(dxPx, dyPx) {
+    const s = this.state.scale;
+    this.set({ cx: this.state.cx - dxPx / s, cy: this.state.cy - dyPx / s });
+  }
+  /** Centre on a cell, optionally switching floor and area. */
+  centreOn(x, y, z, area) {
+    const patch = { cx: x, cy: y };
+    if (z !== void 0) patch.z = z;
+    if (area !== void 0) patch.area = area;
+    this.set(patch);
+  }
+  /** Scale and centre so every given cell is visible with a margin. */
+  fitTo(cells, maxScale = 60) {
+    if (!cells.length) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const c of cells) {
+      x0 = Math.min(x0, c.x);
+      y0 = Math.min(y0, c.y);
+      x1 = Math.max(x1, c.x);
+      y1 = Math.max(y1, c.y);
+    }
+    const w = x1 - x0 + 2, hgt = y1 - y0 + 2;
+    const scale = Math.min(maxScale, Math.max(MIN_SCALE, Math.floor(Math.min(this.width / w, this.height / hgt))));
+    this.set({ cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, scale });
+  }
+  /** Whether a cell is on screen (with a margin of `pad` cells inside the edge). */
+  isVisible(x, y, pad = 0.5) {
+    const p = this.pointOf(x, y);
+    const m = pad * this.state.scale;
+    return p.px >= m && p.py >= m && p.px <= this.width - m && p.py <= this.height - m;
+  }
+  /* ── selection ── */
+  select(ids, add = false) {
+    if (!add) this.selection.clear();
+    for (const id of ids) this.selection.add(id);
+    this.emit();
+  }
+  toggleSelect(id) {
+    if (this.selection.has(id)) this.selection.delete(id);
+    else this.selection.add(id);
+    this.emit();
+  }
+  clearSelection() {
+    if (!this.selection.size) return;
+    this.selection.clear();
+    this.emit();
+  }
+  /** The single selected room id, or null. */
+  single() {
+    return this.selection.size === 1 ? [...this.selection][0] : null;
+  }
+  setPick(p) {
+    this.pick = p;
+    this.emit();
+  }
+  /** The hot-reload snapshot. */
+  snapshot() {
+    return { view: { ...this.state }, selection: [...this.selection] };
+  }
+  restore(s) {
+    if (!s || typeof s !== "object") return;
+    const o = s;
+    if (o.view) this.state = clean({ ...this.state, ...o.view });
+    if (Array.isArray(o.selection)) {
+      this.selection.clear();
+      for (const id of o.selection) if (typeof id === "string") this.selection.add(id);
+    }
+    this.emit();
+  }
+  dispose() {
+    this.saveNow();
+    this.listeners.clear();
+  }
+};
 
 // src/panel/areas.ts
 var T = {
@@ -3718,7 +3776,7 @@ function itemsMenu(ctx, x, y, items, label) {
         el.append(h("div", { class: "mu-map-pop-sep", role: "separator" }));
         continue;
       }
-      const cls = [css.cmd, it.warn ? css.warn : "", it.on ? css.on : ""].filter(Boolean).join(" ");
+      const cls = ["mi", it.warn ? css.warn : "", it.on ? css.on : ""].filter(Boolean).join(" ");
       el.append(h("button", {
         class: cls,
         type: "button",
@@ -3729,7 +3787,7 @@ function itemsMenu(ctx, x, y, items, label) {
           close();
           it.run?.();
         }
-      }, it.label, it.hint ? h("span", { class: "mu-map-pop-hint" }, it.hint) : null));
+      }, h("span", { class: "mu-map-mi-label" }, it.label), it.hint ? h("span", { class: "k" }, it.hint) : null));
     }
   }, { label });
 }
@@ -3980,7 +4038,7 @@ function buildToolbar(ctx) {
   const down = btn(T4.down, T4.tipDown, () => ctx.actions.setFloor(-1), { class: `${css.cmd} ${css.sq}` });
   const up = btn(T4.up, T4.tipUp, () => ctx.actions.setFloor(1), { class: `${css.cmd} ${css.sq}` });
   const z = h("span", { class: "mu-map-z", title: T4.tipFloor, "aria-live": "polite" }, "Z0");
-  const area = h("select", { title: T4.tipArea, "aria-label": T4.tipArea });
+  const area = h("select", { class: css.field, title: T4.tipArea, "aria-label": T4.tipArea });
   area.addEventListener("change", () => {
     ctx.view.set({ area: area.value });
     ctx.actions.fit();
@@ -4510,8 +4568,8 @@ function mountPanel(deps, el, pctx) {
     return store.rooms().filter((r) => r.z === v.z && r.area === v.area).map((r) => ({ x: r.x, y: r.y }));
   };
   const actions = {
-    zoom(factor, at) {
-      const p = at ?? { px: view.width / 2, py: view.height / 2 };
+    zoom(factor, at2) {
+      const p = at2 ?? { px: view.width / 2, py: view.height / 2 };
       view.zoomAt(factor, p.px, p.py);
     },
     fit() {
@@ -5417,6 +5475,8 @@ var COPY = {
     autoConnectHint: "a new room links to the room next to it when their exits face each other",
     areasFromGame: "Group rooms by the area the game names",
     areasFromGameHint: "off: every room goes in one area",
+    areaOnEnter: "New area for in, out, enter, board and leave",
+    areaOnEnterHint: "a room first reached by going in or out, or by enter, board, leave or exit, starts its own area; off: it is placed beside the previous room",
     keepDesc: "Keep room descriptions in the map",
     keepDescHint: "descriptions make rooms easier to tell apart in games without room ids, and make the map larger",
     fromText: "Read moves and exits from the game text",
@@ -5450,6 +5510,7 @@ var index_default = defineExtension({
       items: [
         { key: "autoConnect", label: COPY.settings.autoConnect, default: true, kind: "toggle", scope: "both", group: "Mapping", hint: COPY.settings.autoConnectHint },
         { key: "areasFromGame", label: COPY.settings.areasFromGame, default: true, kind: "toggle", scope: "both", group: "Mapping", hint: COPY.settings.areasFromGameHint },
+        { key: "areaOnEnter", label: COPY.settings.areaOnEnter, default: true, kind: "toggle", scope: "both", group: "Mapping", hint: COPY.settings.areaOnEnterHint },
         { key: "keepDesc", label: COPY.settings.keepDesc, default: true, kind: "toggle", scope: "both", group: "Mapping", hint: COPY.settings.keepDescHint },
         { key: "fromText", label: COPY.settings.fromText, default: true, kind: "toggle", scope: "both", group: "Mapping", hint: COPY.settings.fromTextHint },
         {

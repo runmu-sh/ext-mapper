@@ -79,3 +79,25 @@ test('opposite, isDirKey, sameDir, shortOf', () => {
   assert.equal(shortOf('in'), 'in');
   assert.throws(() => shortOf('sideways'));
 });
+
+test('nautical directions: fore, aft, starboard, port and their compounds', () => {
+  const cases = {
+    north: ['fore', 'forward', 'fwd', 'bow'], south: ['aft', 'astern', 'stern', 'Aft'], east: ['starboard', 'stbd'], west: ['port', 'portside', 'larboard'],
+    northeast: ['fore starboard', 'fore-starboard'], southwest: ['aft port'],
+    'up south': ['up aft', 'uaft', 'u aft'], 'down east': ['down starboard', 'dstarboard'],
+  };
+  for (const [name, raws] of Object.entries(cases)) for (const raw of raws) assert.equal(parseDir(raw)?.name, name, raw);
+  assert.equal(sameDir('aft', 's'), true);
+  assert.equal(opposite(parseDir('fore').name), 'south');
+  assert.equal(parseDir('portal'), null, 'no prefix matching');
+  assert.equal(parseDir('p'), null);
+});
+
+test('compound short forms: use, dsw, une, dn', () => {
+  assert.equal(parseDir('use').name, 'up southeast');
+  assert.equal(parseDir('dsw').name, 'down southwest');
+  assert.equal(parseDir('une').name, 'up northeast');
+  assert.equal(parseDir('dn').name, 'down north');
+  assert.deepEqual([parseDir('use').dx, parseDir('use').dy, parseDir('use').dz], [1, 1, 1]);
+  assert.equal(opposite('up southeast'), 'down northwest');
+});

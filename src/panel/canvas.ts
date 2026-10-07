@@ -12,7 +12,7 @@ const T = {
   blocked: 'Blocked', blockedBody: 'a room is in the way', cancel: 'Cancel', exits: 'exits', warn: '⚠',
 };
 
-/** How close to a room's centre a pointer must be (in cells) to hit it. */
+/** How close to a room's centre a pointer must be (in cells) to hit it: the drawn square (ROOM_HALF 0.36) plus a hair. */
 const HIT_HALF = 0.4;
 const DRAG_PX = 4;
 

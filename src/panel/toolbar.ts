@@ -32,7 +32,7 @@ export function buildToolbar(ctx: PanelCtx): Toolbar {
   const down = btn(T.down, T.tipDown, () => ctx.actions.setFloor(-1), { class: `${css.cmd} ${css.sq}` });
   const up = btn(T.up, T.tipUp, () => ctx.actions.setFloor(1), { class: `${css.cmd} ${css.sq}` });
   const z = h('span', { class: 'mu-map-z', title: T.tipFloor, 'aria-live': 'polite' }, 'Z0');
-  const area = h('select', { title: T.tipArea, 'aria-label': T.tipArea }) as HTMLSelectElement;
+  const area = h('select', { class: css.field, title: T.tipArea, 'aria-label': T.tipArea }) as HTMLSelectElement;
   area.addEventListener('change', () => { ctx.view.set({ area: area.value }); ctx.actions.fit(); });
   const areas = btn(T.areas, T.tipAreas, (e) => openAreas(ctx, e.currentTarget as HTMLElement), { 'aria-haspopup': 'dialog' });
   const mapping = btn(T.mapping, T.tipMapping, () => ctx.actions.togglePaused(), { class: css.toggle, 'aria-pressed': 'true' });

@@ -7,13 +7,17 @@ const P = '.ext-panel[data-ext="mapper"] .mu-map';
 export const PANEL_CSS = `
 ${P} { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg-elev); color: var(--fg); font-family: var(--font-mono); font-size: var(--shell-font-size, 15px); }
 ${P} * { box-sizing: border-box; }
-${P} button, ${P} input, ${P} select, ${P} textarea { font: inherit; }
+/* No \`font: inherit\` on controls here: this sheet is in the \`ext\` layer and would beat the host's \`.sh-cmd\` /
+   \`.sh-toggle\` sizes (.68rem). The host's base.css already resets control fonts in the \`mu\` layer. */
 
-${P} .mu-map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; padding: 4px 8px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
-${P} .mu-map-bar .mu-map-group { display: inline-flex; align-items: center; gap: 1px; }
+/* The toolbar matches the Terminal's "Output filters and tools" bar (TerminalPanel.vue .logbar): 6px gap, 3px 8px padding. */
+${P} .mu-map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 8px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
+${P} .mu-map-bar .mu-map-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; }
 ${P} .mu-map-bar .mu-map-gap { flex: 1; }
-${P} .mu-map-bar select { min-height: 24px; max-width: 10em; background: var(--bg); color: var(--fg); border: 1px solid var(--border-bright); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; padding: 0 .5ch; }
-${P} .mu-map-bar .mu-map-z { display: inline-block; min-width: 3ch; text-align: center; color: var(--gold); font-size: .68rem; letter-spacing: .1em; }
+/* The area select is an underline field (.sh-field, as the host's Hotbar edit cells draw a select) at the bar's type size. */
+${P} .mu-map-bar select { min-height: 24px; max-width: 10em; padding: 0 .5ch; background: var(--bg-elev); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-dim); cursor: pointer; }
+${P} .mu-map-bar select:hover { color: var(--accent-bright); }
+${P} .mu-map-bar .mu-map-z { display: inline-block; min-width: 3ch; text-align: center; color: var(--gold); font-size: .68rem; letter-spacing: .14em; }
 
 ${P} .mu-map-body { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 ${P} .mu-map-stage { position: relative; flex: 1; min-height: 60px; background: var(--bg); overflow: hidden; }
@@ -34,11 +38,16 @@ ${P} .mu-map-tip .mu-map-tip-dim { color: var(--fg-dim); }
 ${P} .mu-map-tip .mu-map-tip-warn { color: var(--alert); }
 ${P} .mu-map-tip .mu-map-tip-walk { color: var(--gold); font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; }
 
-${P} .mu-map-pop { position: absolute; z-index: 20; min-width: 9rem; max-width: 18rem; max-height: 70%; overflow: auto; display: flex; flex-direction: column; align-items: stretch; padding: 3px 0; background: var(--bg-elev); border: 1px solid var(--accent); }
+/* Popovers are the host's dropdown (.drop in controls.css: --bg-elev, a 1px --accent edge, --menu-shadow); menu rows
+   are the host's .mi with its .k key hint (ContextMenu.vue), dialogs (Legend, Controls, Areas) hold a title and body. */
+${P} .mu-map-pop { position: absolute; z-index: 20; min-width: 12rem; max-width: 18rem; max-height: 70%; overflow: auto; display: flex; flex-direction: column; align-items: stretch; padding: 0; background: var(--bg-elev); border: 1px solid var(--accent); box-shadow: var(--menu-shadow); }
+${P} .mu-map-pop .mi { justify-content: space-between; gap: 1.2rem; min-height: 24px; width: 100%; }
+${P} .mu-map-pop .mi .mu-map-mi-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+${P} .mu-map-pop .mi:disabled { color: var(--fg-faint); background: none; pointer-events: none; }
 ${P} .mu-map-pop .cmd, ${P} .mu-map-pop .sh-cmd, ${P} .mu-map-pop .tool { justify-content: flex-start; width: 100%; padding: 0 1.2ch 0 .8ch; }
 ${P} .mu-map-pop .mu-map-pop-hint { margin-left: auto; padding-left: 1.5ch; color: var(--fg-faint); font-size: .6rem; letter-spacing: .08em; }
 ${P} .mu-map-pop .mu-map-pop-sep { height: 1px; margin: 2px 0; background: var(--border); }
-${P} .mu-map-pop .mu-map-pop-title { padding: 2px .8ch; color: var(--gold); font-size: .6rem; letter-spacing: .24em; text-transform: uppercase; }
+${P} .mu-map-pop .mu-map-pop-title { padding: 6px 10px 2px; color: var(--fg-faint); font-size: .6rem; letter-spacing: .2em; text-transform: uppercase; }
 ${P} .mu-map-pop .mu-map-pop-body { padding: 4px 1ch 6px; font-size: .74rem; line-height: 1.5; color: var(--fg-dim); }
 ${P} .mu-map-pop .mu-map-pop-body dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 1.2ch; margin: 0; }
 ${P} .mu-map-pop .mu-map-pop-body dt { color: var(--fg); white-space: nowrap; display: flex; align-items: center; gap: .6ch; }
@@ -46,11 +55,15 @@ ${P} .mu-map-pop .mu-map-pop-body dd { margin: 0; }
 ${P} .mu-map-pop .mu-map-pop-body kbd { color: var(--gold); font-family: inherit; font-size: .66rem; letter-spacing: .08em; }
 ${P} .mu-map-pop svg { width: 14px; height: 14px; display: inline-block; vertical-align: middle; }
 
-${P} .mu-map-insp { flex: 0 0 auto; max-height: 40%; min-height: 0; overflow: auto; background: var(--bg-elev); border-top: 1px solid var(--border-bright); padding: 4px 10px 8px; font-size: .78rem; }
+/* The inspector is content under the stage: a --border rule (--border-bright outlines controls), the host's .82rem body size.
+   Its title is the Scene panel's (t-title: .85rem .16em UPPER --accent-bright, a --border-bright bottom rule). */
+${P} .mu-map-insp { flex: 0 0 auto; max-height: 40%; min-height: 0; overflow: auto; background: var(--bg-elev); border-top: 1px solid var(--border); padding: 4px 10px 8px; font-size: .82rem; }
 ${P} .mu-map-insp[hidden], ${P} .mu-map-banner[hidden], ${P} .mu-map [hidden] { display: none; }
 ${P} .mu-map-insp .mu-map-sec, ${P} .mu-map-area-detail .mu-map-sec { margin: .6rem 0 .3rem; }
-${P} .mu-map-insp .mu-map-title, ${P} .mu-map-area-detail .mu-map-title { display: flex; align-items: baseline; gap: 1ch; color: var(--accent-bright); font-size: .82rem; letter-spacing: .1em; padding: 4px 0 2px; }
-${P} .mu-map-insp .mu-map-title .mu-map-id, ${P} .mu-map-area-detail .mu-map-title .mu-map-id { color: var(--fg-faint); font-size: .62rem; letter-spacing: .08em; }
+${P} .mu-map-insp .mu-map-title, ${P} .mu-map-area-detail .mu-map-title { display: flex; align-items: baseline; gap: 1ch; color: var(--accent-bright); font-size: .85rem; letter-spacing: .16em; text-transform: uppercase; padding: 4px 0 3px; border-bottom: 1px solid var(--border-bright); }
+html[data-glow] ${P} .mu-map-title { text-shadow: 0 0 6px var(--glow); }
+${P} .mu-map-insp .mu-map-title .mu-map-id, ${P} .mu-map-area-detail .mu-map-title .mu-map-id { color: var(--fg-faint); font-size: .62rem; letter-spacing: .08em; text-transform: none; text-shadow: none; }
+${P} .mu-map-title .sh-plate { text-shadow: none; }
 ${P} .mu-map-insp .mu-map-meta, ${P} .mu-map-area-detail .mu-map-meta { color: var(--fg-dim); font-size: .7rem; letter-spacing: .04em; }
 ${P} .mu-map-insp .mu-map-hint, ${P} .mu-map-area-detail .mu-map-hint { color: var(--fg-faint); font-size: .64rem; letter-spacing: .14em; text-transform: uppercase; padding: 8px 0; }
 ${P} .mu-map-insp .mu-map-warn, ${P} .mu-map-area-detail .mu-map-warn { display: flex; align-items: center; gap: 1ch; color: var(--alert); font-size: .7rem; padding: 2px 0; }
@@ -83,8 +96,9 @@ ${P} .mu-map-glyphs { display: flex; flex-wrap: wrap; gap: 2px; align-items: cen
 ${P} .mu-map-glyphs .mu-map-sym { width: 2.6ch; max-width: 3.5em; text-align: center; }
 
 ${P} .mu-map-chips { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
-${P} .mu-map-chip { display: inline-flex; align-items: center; gap: .4ch; min-height: 24px; padding: 0 .4ch 0 .8ch; border: 1px solid var(--border); color: var(--fg); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; }
-${P} .mu-map-chip button { min-width: 20px; min-height: 22px; }
+/* A tag is a dim plate (.sh-plate.dim: a --border-bright hairline, t-micro) with its × inside. */
+${P} .mu-map-chip { display: inline-flex; align-items: center; gap: 0; min-height: 24px; padding: 0 0 0 .8ch; box-shadow: inset 0 0 0 1px var(--border-bright); color: var(--fg-dim); font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; }
+${P} .mu-map-chip button { min-width: 24px; min-height: 24px; }
 ${P} .mu-map-chips input { width: 8em; }
 
 ${P} .mu-map-insp textarea { width: 100%; min-height: 3.2em; resize: vertical; }
@@ -100,7 +114,8 @@ ${P} .mu-map-exit .mu-map-door { color: var(--fg-dim); font-size: .62rem; letter
 ${P} .mu-map-exit .mu-map-cost { width: 3.5em; min-height: 22px; }
 ${P} .mu-map-exit .mu-map-exit-tools { display: inline-flex; flex-wrap: wrap; gap: 0 2px; margin-left: auto; }
 
-${P} .mu-map-status { display: flex; align-items: center; gap: 1.2ch; padding: 2px 10px; min-height: 20px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--fg-dim); font-size: .64rem; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+/* The status line: a bar (3px 8px) of readouts in the host's readout style (.64rem .14em UPPER --fg-dim). */
+${P} .mu-map-status { display: flex; align-items: center; gap: 1.2ch; padding: 3px 8px; min-height: 24px; border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--fg-dim); font-size: .64rem; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
 ${P} .mu-map-status .mu-map-gap { flex: 1; }
 ${P} .mu-map-status .mu-map-status-msg { color: var(--gold); overflow: hidden; text-overflow: ellipsis; }
 ${P} .mu-map-status .mu-map-status-warn { color: var(--alert); }

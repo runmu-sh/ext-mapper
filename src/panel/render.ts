@@ -39,12 +39,18 @@ export interface Scene {
   areaColor?: RoomColor;
 }
 
-/** Half the side of a room square, in cells. */
-export const ROOM_HALF = 0.27;
+/**
+ * Half the side of a room square, in cells: the square is 72% of the cell and the gap between neighbours 28%,
+ * which is a link one third as long as a room (0.27 left a gap almost as wide as the room). Stubs and their dots
+ * stay inside the gap (edge + STUB_LEN + 2 × dot radius < 1 − ROOM_HALF).
+ */
+export const ROOM_HALF = 0.36;
+/** The length of an unexplored-exit stub from the room's edge, in cells. */
+export const STUB_LEN = 0.11;
 /** Grid dots appear from this scale. */
 export const GRID_MIN_SCALE = 22;
 /** Names draw (with `names` on) from this scale. */
-export const NAMES_MIN_SCALE = 40;
+export const NAMES_MIN_SCALE = 44;
 /** Curved links get their key chip from this scale. */
 export const CHIP_MIN_SCALE = 44;
 
@@ -294,20 +300,20 @@ function drawDecor(ctx: CanvasRenderingContext2D, room: MapRoom, scene: Scene, p
 
 function drawStub(ctx: CanvasRenderingContext2D, cx: number, cy: number, dx: number, dy: number, half: number, s: number, t: Tokens, filled: boolean, diagonalFloor: boolean): void {
   const a = edgePoint(cx, cy, dx, dy, half);
-  const len = Math.max(4, s * 0.2);
+  const len = Math.max(3, s * STUB_LEN);
   const n = Math.hypot(dx, dy) || 1;
   const ex = a.x + (dx / n) * len, ey = a.y + (dy / n) * len;
   ctx.strokeStyle = t.fgDim;
   ctx.lineWidth = Math.max(1, s * 0.04);
   ctx.setLineDash([]);
   ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(ex, ey); ctx.stroke();
-  const r = Math.max(2, s * 0.07);
+  const r = Math.max(2, s * 0.06);
   ctx.beginPath();
   ctx.arc(ex + (dx / n) * r, ey + (dy / n) * r, r, 0, Math.PI * 2);
   if (filled) { ctx.fillStyle = t.fgDim; ctx.fill(); } else { ctx.stroke(); }
   if (diagonalFloor) {
-    const tr = r * 1.2;
-    const tx = ex + (dx / n) * r * 3, ty = ey + (dy / n) * r * 3;
+    const tr = r;
+    const tx = ex + (dx / n) * r * 2.4, ty = ey + (dy / n) * r * 2.4;
     ctx.fillStyle = t.fgDim;
     ctx.beginPath(); ctx.moveTo(tx, ty - tr); ctx.lineTo(tx + tr, ty + tr); ctx.lineTo(tx - tr, ty + tr); ctx.closePath(); ctx.fill();
   }
@@ -372,19 +378,52 @@ function drawName(ctx: CanvasRenderingContext2D, room: MapRoom, scene: Scene, px
   const show = room.id === scene.hover || single || (view.names && s >= NAMES_MIN_SCALE);
   if (!show || !room.name) return;
   const cx = px(room.x), cy = py(room.y);
-  const size = Math.max(9, Math.min(13, Math.round(s * 0.26)));
+  const size = Math.max(9, Math.min(12, Math.round(s * 0.22)));
   ctx.font = `${size}px ${scene.fontFamily}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  const maxW = Math.max(60, Math.min(180, s * 3.4));
+  // A label may span almost two cells, so rooms in a row take turns above and below (labelsAbove); the hover and
+  // the single selection always go below.
+  const left = at(scene, room.x - 1, room.y), right = at(scene, room.x + 1, room.y);
+  const row = left !== null || right !== null;
+  const above = labelsAbove(scene, room) && !single && room.id !== scene.hover;
+  // Two rooms on the same side are two cells apart: a label (with its 6px pad) stays under that. A row neighbour
+  // forced onto the same side (a room over it blocks "above") leaves this label one cell.
+  const crowded = (left !== null && labelsAbove(scene, left) === above) || (right !== null && labelsAbove(scene, right) === above);
+  const maxW = Math.max(crowded ? 36 : 60, Math.min(180, crowded ? s - 6 : row ? s * 2 - 10 : s * 3.4));
   const label = ellipsise(ctx, room.name, maxW);
   const tw = ctx.measureText(label).width + 6;
-  const th = size + 4;
-  const y = cy + half + 3;
+  const th = size + 2;
+  // In the gap beside the room (the gap is (1 − 2·ROOM_HALF)·s: at NAMES_MIN_SCALE the label just fits it).
+  const y = above ? cy - half - 1 - th : cy + half + 1;
   ctx.fillStyle = withAlpha(t.bgDeep, 0.9);
   ctx.fillRect(cx - tw / 2, y, tw, th);
   ctx.fillStyle = room.id === scene.currentId ? t.accentBright : t.fg;
-  ctx.fillText(label, cx, y + 2);
+  ctx.fillText(label, cx, y + 1);
+}
+
+/** Whether a room of the scene sits at (room.x + dx, room.y + dy). */
+function occupied(scene: Scene, room: MapRoom, dx: number, dy: number): boolean {
+  return at(scene, room.x + dx, room.y + dy, room) !== null;
+}
+
+/** The room of the scene at (x, y) other than `not`, or null. */
+function at(scene: Scene, x: number, y: number, not?: MapRoom): MapRoom | null {
+  for (const r of scene.rooms) if (r.x === x && r.y === y && r !== not) return r;
+  return null;
+}
+
+/** Where a room's label goes by position alone: above when a neighbour is under it or by row parity, never when a
+ * neighbour is over it. */
+function labelsAbove(scene: Scene, room: MapRoom): boolean {
+  if (occupied(scene, room, 0, -1)) return false;
+  if (occupied(scene, room, 0, 1)) return true;
+  const left = at(scene, room.x - 1, room.y), right = at(scene, room.x + 1, room.y);
+  if (left === null && right === null) return false;
+  // A row neighbour that cannot label above (a room over it) labels below: this one yields and goes above.
+  const blocked = (r: MapRoom | null) => r !== null && at(scene, r.x, r.y - 1) !== null;
+  if (blocked(left) || blocked(right)) return true;
+  return Math.abs(room.x + room.y) % 2 === 1;
 }
 
 function drawDrag(ctx: CanvasRenderingContext2D, drag: DragPreview, t: Tokens, px: (x: number) => number, py: (y: number) => number, half: number): void {

@@ -14,7 +14,7 @@ import type { Dir, MapExit, MapRoom, MapStore, MapperEvent, Position, SceneInput
 export interface TrackerOpts {
   storeFor(worldId: string): MapStore | null;
   worldOf(sid: string): string | null;
-  /** The extension's settings, read per world: `autoConnect`, `areasFromGame`, `keepDesc` (all default true). */
+  /** The extension's settings, read per world: `autoConnect`, `areasFromGame`, `areaOnEnter`, `keepDesc` (all default true). */
   settings: { get<T>(key: string, worldId: string | null): T };
   now?(): number;
   /** The active profile's move verbs for a world; default {@link DEFAULT_MOVE_VERBS}. */
@@ -47,6 +47,8 @@ const lc = (s: string | undefined): string => (s ?? '').trim().toLowerCase();
 const sameName = (a: string, b: string): boolean => lc(a) === lc(b);
 const atCell = (r: MapRoom, c: Cell): boolean => r.area === c.area && r.x === c.x && r.y === c.y && r.z === c.z;
 const zero = (d: Dir): boolean => d.dx === 0 && d.dy === 0 && d.dz === 0;
+/** Move commands that go into or out of something rather than along the grid. */
+const ENTER_VERB = /^(?:go\s+)?(?:enter|board|embark|disembark|leave|exit)(?:\s|$)/i;
 
 /** The exit of a room a key names: by key, by display name, or the same direction in another form. */
 export function exitFor(room: MapRoom, key: string): MapExit | undefined {
@@ -269,7 +271,15 @@ export function createTracker(opts: TrackerOpts): TrackerImpl {
     const used = prev && key !== null ? exitFor(prev, key) : undefined;
     const dir = (key !== null ? parseDir(key) : null) ?? (used?.dir ? parseDir(used.dir) : null);
     const areasFromGame = setting('areasFromGame', t.worldId, true);
-    const areaId = areasFromGame && input.area ? slug(input.area) : '';
+    let areaId = areasFromGame && input.area ? slug(input.area) : '';
+    // `in` / `out`, `enter <x>`, `board`, `leave`: a move into or out of something, with no place on the grid. When
+    // the game names no area and the room is new, it opens its own area (named after the room) rather than being
+    // dropped diagonally beside the previous one; the exit taken links the two areas. A named exit such as
+    // Underspire's `market (m)` is ordinary movement and stays in the area.
+    const enters = prev !== null && key !== null && !input.coords && !(areasFromGame && input.area) && (dir ? zero(dir) : ENTER_VERB.test(key));
+    const newArea = enters && setting('areaOnEnter', t.worldId, true) ? input.name : null;
+    // Without a game-named area, an ordinary move stays in the previous room's area (a room-named one included).
+    if (!areaId && prev && !enters) areaId = prev.area;
     const sig = sigOf(input.name, input.desc);
     let expected: Cell | null = null;
     if (input.coords) expected = { area: areaId, ...input.coords };
@@ -306,8 +316,10 @@ export function createTracker(opts: TrackerOpts): TrackerImpl {
     let created = false;
     store.batch('move', () => {
       if (areaId && areasFromGame && input.area && !store.area(areaId)) store.setArea({ id: areaId, name: input.area });
-      if (found) { adopt(store, t, found.room, input, areaId); dest = store.room(found.room.id)!; }
+      // A known room changes area only on the game's word, never by inheriting the previous room's.
+      if (found) { adopt(store, t, found.room, input, areasFromGame && input.area ? areaId : found.room.area); dest = store.room(found.room.id)!; }
       else {
+        if (newArea !== null) areaId = store.createArea(newArea).id;
         const { cell, warn } = placeNew(store, input, areaId, prev, dir, key);
         dest = createFor(store, t, input, cell, warn);
         created = true;
